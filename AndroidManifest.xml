@@ -25,6 +25,8 @@
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="29" />
 
+    <protected-broadcast android:name="android.net.conn.SOFTAP_CLIENT_CONNECT" />
+
     <!-- Permissions must be defined here, and not in the base manifest, as the network stack
          running in the system server process does not need any permission, and having privileged
          permissions added would cause crashes on startup unless they are also added to the

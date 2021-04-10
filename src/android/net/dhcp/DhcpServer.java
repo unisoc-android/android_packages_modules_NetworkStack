@@ -58,6 +58,7 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.text.TextUtils;
 import android.util.Pair;
+import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.HexDump;
@@ -83,6 +84,7 @@ import java.util.ArrayList;
  */
 public class DhcpServer extends IDhcpServer.Stub {
     private static final String REPO_TAG = "Repository";
+    private static final String TAG = "DhcpServer";
 
     // Lease time to transmit to client instead of a negative time in case a lease expired before
     // the server could send it (if the server process is suspended for example).
@@ -291,6 +293,24 @@ public class DhcpServer extends IDhcpServer.Stub {
     public void stop(@Nullable INetworkStackStatusCallback cb) {
         mDeps.checkCaller();
         sendMessage(CMD_STOP_DHCP_SERVER, cb);
+    }
+
+    public static class ClientInfoCallback {
+        /**
+         * notify softAp the client info when DHCP ACK is sent.
+         */
+        public void onClientAcked(String hostName, String macAddr, String ipAddr) { }
+    }
+
+
+    private ClientInfoCallback mClientCallback;
+
+    public void registerClientInfoCallback(ClientInfoCallback clientInfoCallback) {
+        mClientCallback = clientInfoCallback;
+    }
+
+    public void unregisterClientInfoCallback(ClientInfoCallback clientInfoCallback) {
+        mClientCallback = null;
     }
 
     private void sendMessage(int what, @Nullable Object obj) {
@@ -508,6 +528,15 @@ public class DhcpServer extends IDhcpServer.Stub {
                 new ArrayList<>(mServingParams.dnsServers),
                 mServingParams.getServerInet4Addr(), null /* domainName */, hostname,
                 mServingParams.metered, (short) mServingParams.linkMtu);
+
+        if (mIfName != null && mIfName.contains("wlan") && mClientCallback != null) {
+            Log.d(TAG, "transmitAck: hostname of client is " + request.mHostName +
+                     ", MacAddress is " + clientMac.toString());
+
+            String ipv4Addr = lease.getNetAddr() != null ? lease.getNetAddr().getHostAddress() : null;
+            Log.d(TAG, "ip address assigned to client is " + ipv4Addr );
+            mClientCallback.onClientAcked(request.mHostName, clientMac.toString(), ipv4Addr);
+        }
 
         return transmitOfferOrAckPacket(ackPacket, request, lease, clientMac, broadcastFlag);
     }

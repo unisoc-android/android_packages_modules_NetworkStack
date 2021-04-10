@@ -40,6 +40,7 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.PrivateDnsConfigParcel;
 import android.net.dhcp.DhcpServer;
+import android.net.dhcp.DhcpServer.ClientInfoCallback;
 import android.net.dhcp.DhcpServingParams;
 import android.net.dhcp.DhcpServingParamsParcel;
 import android.net.dhcp.IDhcpServerCallbacks;
@@ -50,6 +51,8 @@ import android.net.util.SharedLog;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.ArraySet;
+import android.os.UserHandle;
+import android.util.Log;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.IndentingPrintWriter;
@@ -72,6 +75,13 @@ import java.util.Iterator;
 public class NetworkStackService extends Service {
     private static final String TAG = NetworkStackService.class.getSimpleName();
     private static NetworkStackConnector sConnector;
+
+    private static final String ACTION_SOFTAP_CLIENT_CONNECT =
+                                              "android.net.conn.SOFTAP_CLIENT_CONNECT";
+
+    private static final String EXTRA_HOST_NAME = "hostName";
+    private static final String EXTRA_MAC_ADDR = "macAddr";
+    private static final String EXTRA_IP_ADDR = "ipAddr";
 
     /**
      * Create a binder connector for the system server to communicate with the network stack.
@@ -113,6 +123,19 @@ public class NetworkStackService extends Service {
         @GuardedBy("mIpClients")
         private final ArrayList<WeakReference<IpClient>> mIpClients = new ArrayList<>();
         private final IpMemoryStoreService mIpMemoryStoreService;
+
+        private DhcpServer.ClientInfoCallback mClientInfoCallback = new ClientInfoCallback() {
+             @Override
+                public void onClientAcked(String hostName, String macAddr, String ipAddr) {
+                    Log.d(TAG, "onClientAcked: hostName is " + hostName + ", mac is "
+                              + macAddr + ", ip is " + ipAddr);
+                    Intent intent = new Intent(ACTION_SOFTAP_CLIENT_CONNECT);
+                    intent.putExtra(EXTRA_HOST_NAME, hostName);
+                    intent.putExtra(EXTRA_MAC_ADDR, macAddr);
+                    intent.putExtra(EXTRA_IP_ADDR, ipAddr);
+                    mContext.sendBroadcastAsUser(intent, UserHandle.ALL);
+               }
+         };
 
         private static final int MAX_VALIDATION_LOGS = 10;
         @GuardedBy("mValidationLogs")
@@ -190,6 +213,11 @@ public class NetworkStackService extends Service {
                 return;
             }
             cb.onDhcpServerCreated(STATUS_SUCCESS, server);
+
+           if (ifName != null && ifName.contains("wlan") && server != null) {
+                Log.d(TAG, "makeDhcpServer: call registerClientInfoCallback ");
+                server.registerClientInfoCallback(mClientInfoCallback);
+            }
         }
 
         @Override

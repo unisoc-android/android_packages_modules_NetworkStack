@@ -721,8 +721,9 @@ public abstract class DhcpPacket {
     protected void addCommonClientTlvs(ByteBuffer buf) {
         addTlv(buf, DHCP_MAX_MESSAGE_SIZE, (short) MAX_LENGTH);
         addTlv(buf, DHCP_VENDOR_CLASS_ID, getVendorId());
-        final String hn = getHostname();
-        if (!TextUtils.isEmpty(hn)) addTlv(buf, DHCP_HOST_NAME, hn);
+        //final String hn = getHostname();
+        //if (!TextUtils.isEmpty(hn)) addTlv(buf, DHCP_HOST_NAME, hn);
+        if (!TextUtils.isEmpty(DhcpClient.HOSTNAME)) addTlv(buf, DHCP_HOST_NAME, DhcpClient.HOSTNAME);
     }
 
     protected void addCommonServerTlvs(ByteBuffer buf) {

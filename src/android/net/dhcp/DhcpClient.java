@@ -56,8 +56,11 @@ import android.net.util.NetworkStackUtils;
 import android.net.util.SocketUtils;
 import android.os.Message;
 import android.os.SystemClock;
+import android.os.SystemProperties;
+import android.provider.Settings.Secure;
 import android.system.ErrnoException;
 import android.system.Os;
+import android.text.TextUtils;
 import android.util.EventLog;
 import android.util.Log;
 import android.util.SparseArray;
@@ -223,6 +226,8 @@ public class DhcpClient extends StateMachine {
     private long mDhcpLeaseExpiry;
     private DhcpResults mOffer;
 
+    public static String HOSTNAME = "";
+
     // Milliseconds SystemClock timestamps used to record transition times to DhcpBoundState.
     private long mLastInitEnterTime;
     private long mLastBoundExitTime;
@@ -255,6 +260,16 @@ public class DhcpClient extends StateMachine {
         mContext = context;
         mController = controller;
         mIfaceName = iface;
+
+        HOSTNAME = SystemProperties.get("net.hostname");;
+        if (TextUtils.isEmpty(HOSTNAME)) {
+            if (DBG) Log.d(TAG, "net.hostname is empty");
+            String id = Secure.getString(context.getContentResolver(), Secure.ANDROID_ID);
+            if (id != null && id.length() > 0) {
+                  if (DBG) Log.d(TAG, "get ANDROID_ID " + id);
+                  HOSTNAME = new String("android-").concat(id);
+            }
+        }
 
         addState(mStoppedState);
         addState(mDhcpState);
@@ -459,7 +474,7 @@ public class DhcpClient extends StateMachine {
         ByteBuffer packet = DhcpPacket.buildRequestPacket(
                 encap, mTransactionId, getSecs(), clientAddress,
                 DO_UNICAST, mHwAddr, requestedAddress,
-                serverAddress, REQUESTED_PARAMS, null);
+                serverAddress, REQUESTED_PARAMS, HOSTNAME);
         String serverStr = (serverAddress != null) ? serverAddress.getHostAddress() : null;
         String description = "DHCPREQUEST ciaddr=" + clientAddress.getHostAddress() +
                              " request=" + requestedAddress.getHostAddress() +
